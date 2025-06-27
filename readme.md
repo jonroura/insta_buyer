@@ -1,232 +1,184 @@
-# Instagram DM MCP server
 
-This is a Model Context Protocol (MCP) server for sending instagram Direct Messages.
+![Buyer Whisperer banner](assets/banner.jpg)
 
-With this you can send Instagram Direct Messages from your account (more capabilities coming soon).
+# The Instagram Buyer Whisperer
 
-Here's an example of what you can do when it's connected to Claude.
+**Turn Your Instagram DMs into an AI-Powered Sales Engine.**
 
-
-https://github.com/user-attachments/assets/9c945f25-4484-4223-8d6b-5bf31243464c
-
-
-> To get updates on this and other projects we work on [enter your email here](https://tally.so/r/np6rYy)
-
-PS: Join our [Twitter community](https://twitter.com/i/communities/1937504082635170114) for all things MCP 
+Buyer Whisperer is an intelligent command center that plugs directly into your Instagram DMs. Built on the revolutionary **Gala Labs MCP Server**, this tool uses AI to analyze conversations, surface your hottest leads, and help you craft perfect, human-like pitches to close more deals.
 
 ---
 
-## Hackathon Submission
+<p align="center">
+  <video src="assets/demo.mp4" width="720" controls loop muted></video>
+</p>
 
-Build anything using this Instagram DM MCP (can be technical, no-code or low-code) and submit!
+---
+<div align="center">
 
-No restrictions, open to anyone/anywhere to join.
-
-<div align="left">
-
-[![Submit now](https://img.shields.io/badge/Submit%20now-black?style=for-the-badge&logo=tally&logoColor=white&labelColor=000000&color=000000&size=large)](https://tally.so/r/mR18zl)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge) ![Python Version](https://img.shields.io/badge/Python-3.11+-3776AB.svg?style=for-the-badge&logo=python&logoColor=white) ![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg?style=for-the-badge)
 
 </div>
 
-> Note: submisions due by Friday 27 June 11:59PM PST
-
-### Three cash prizes up for grabs
-
-1. $5k USD - Breaking the internet (go viral AF)
-2. $2.5k USD - Technical Sorcery (coolest technical implementation)
-3. $2.5k USD - Holy Sh*t Award (make our jaws drop)
+> This project is a proud submission to the **Gala Labs MCP Hackathon**. Our mission was to take the powerful, open-source foundation they provided and forge it into a weapon for sales and marketing professionals. A massive thank you to the incredible team at **Gala Labs** for unlocking this new frontier in AI-powered communication.
 
 ---
 
-## Installation
+## 💡 The Problem: Your DMs are a Goldmine You Can't See
+
+Your Instagram DMs are filled with critical sales signals. Customers asking about price, showing trust, hinting at a purchase... but it's all buried in thousands of lines of text. You can't scale your intuition, and valuable leads slip through the cracks every day.
+
+## ✨ The Solution: AI-Powered Sales Intelligence
+
+Buyer Whisperer acts as your personal AI analyst. It reads your latest conversations and instantly tells you:
+
+*   **WHO is ready to buy?** (`spending` score)
+*   **WHO trusts your brand?** (`trust` score)
+*   **WHO is a price-sensitive bargain hunter?** (`price_focus` score)
+*   **WHAT is the mood of the conversation?** (`sentiment` score)
+*   **WHO is genuinely curious and needs information?** (`curiosity` score)
+
+It doesn't just give you data; it gives you a ranked list of leads and helps you talk to them like a real person.
+
+---
+
+## 🛠️ Installation & Setup Guide
+
+Get up and running in under 5 minutes.
 
 ### Prerequisites
 
-- Python 3.11+
-- Anthropic Claude Desktop app (or Cursor)
-- Pip (Python package manager), install with `python -m pip install`
-- An instagram account
+*   Python 3.11+
+*   **The Claude Desktop App** (This is essential for the interactive workflow)
+*   An active Instagram account
 
-### Steps
+### Step 1: Clone the Repository
+Open your terminal and run the following commands:
+```bash
+git clone https://github.com/trypeggy/instagram_dm_mcp.git
+cd instagram_dm_mcp
+```
 
-1. **Clone this repository**
+### Step 2: Install Dependencies
+This project uses standard Python packages.
+```bash
+pip install -r requirements.txt
+```
 
-   ```bash
-   git clone https://github.com/trypeggy/instagram_dm_mcp.git
-   cd instagram_dm_mcp
-   ```
+### Step 3: Configure Your Instagram Credentials
+Create a `.env` file to securely store your credentials. The easiest way is to copy the example file:
+```bash
+cp env.example .env
+```
+Now, open the `.env` file in your favorite text editor and add your Instagram username and password.
 
-2. **Install dependencies**
+### Step 4: Connect to the Claude Desktop App
+This is the magic step that links Buyer Whisperer to your AI.
 
-  - Using uv (recommended):
-    ```bash
-    uv sync
-    ```
-  - Using Pip:
-    ```bash
-    pip install -r requirements.txt
-    ```
+*   Find your Claude configuration file:
+    *   **On Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+    *   **On Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+*   Open the file and add the following server configuration.
 
-3. **Configure Instagram credentials**
+> **IMPORTANT:** You **must** replace `FULL/PATH/TO/instagram_dm_mcp` with the actual, absolute path to the project folder on your computer.
 
-   You have two options for providing your Instagram credentials:
-
-   **Option A: Environment Variables (Recommended)**
-   
-   **Quick Setup (Recommended):**
-   
-   Run the helper script:
-   
-   ```bash
-   python setup_env.py
-   ```
-   
-   This will interactively prompt you for your credentials and create the `.env` file securely.
-   
-   **Manual Setup:**
-   
-   Create a `.env` file in the project root:
-   
-   ```bash
-   cp env.example .env
-   ```
-   
-   Then edit `.env` with your actual credentials:
-   
-   ```
-   INSTAGRAM_USERNAME=your_instagram_username
-   INSTAGRAM_PASSWORD=your_instagram_password
-   ```
-   
-   **Option B: Command Line Arguments**
-   
-   You can still pass credentials as command line arguments (less secure).
-
-4. **Connect to the MCP server**
-
-   **For Claude Desktop:**
-   
-   Save this as `claude_desktop_config.json` in your Claude Desktop configuration directory at:
-
-   ```
-   ~/Library/Application Support/Claude/claude_desktop_config.json
-   ```
-
-   **For Cursor:**
-   
-   Save this as `mcp.json` in your Cursor configuration directory at:
-
-   ```
-   ~/.cursor/mcp.json
-   ```
-
-   **Configuration with Environment Variables (Recommended):**
-   - Using uv
-   
-   ```json
-   {
-     "mcpServers": {
-       "instagram_dms": {
-           "command": "uv",
-           "args": [
-             "run",
-             "--directory",
-             "PATH/TO/instagram_dm_mcp",
-             "python",
-             "src/mcp_server.py"
-           ]
-        }
-      }
+```json
+{
+  "mcpServers": {
+    "insta_buyer": {
+       "command": "python",
+       "args": [
+         "FULL/PATH/TO/instagram_dm_mcp/main.py"
+       ]
     }
-   ```
+  }
+}
+```
 
-   - Using Python
-    ```json
-    {
-      "mcpServers": {
-        "instagram_dms": {
-          "command": "python",
-          "args": [
-            "{{PATH_TO_SRC}}/instagram_dm_mcp/src/ mcp_server.py"
-          ]
-        }
-      }
-    }
-    ```
-
-   **Configuration with Command Line Arguments:**
-   
-   ```json
-   {
-     "mcpServers": {
-       "instagram_dms": {
-         "command": "python",
-         "args": [
-           "{{PATH_TO_SRC}}/instagram_dm_mcp/src/mcp_server.py",
-           "--username",
-           "{{YOUR_INSTAGRAM_USERNAME}}",
-          "--password",
-          "{{YOUR_INSTAGRAM_PASSWORD}}"
-         ]
-       }
-     }
-   }
-   ```
-
-5. **Restart Claude Desktop / Cursor**
-   
-   Open Claude Desktop and you should now see the Instagram DM MCP as an available integration.
-
-   Or restart Cursor.
----
-
-## Usage
-
-Below is a list of all available tools and what they do:
-
-| Tool Name                   | Description                                                                                   |
-|-----------------------------|-----------------------------------------------------------------------------------------------|
-| `send_message`              | Send an Instagram direct message to a user by username.                                       |
-| `send_photo_message`        | Send a photo as an Instagram direct message to a user by username.                            |
-| `send_video_message`        | Send a video as an Instagram direct message to a user by username.                            |
-| `list_chats`                | Get Instagram Direct Message threads (chats) from your account, with optional filters/limits.  |
-| `list_messages`             | Get messages from a specific Instagram Direct Message thread by thread ID. Now exposes `item_type` and shared post/reel info for each message. Use this to determine which download tool to use. |
-| `download_media_from_message` | Download a direct-uploaded photo or video from a DM message (not for shared posts/reels/clips). |
-| `download_shared_post_from_message` | Download media from a shared post, reel, or clip in a DM message (not for direct uploads). |
-| `list_media_messages`       | List all messages containing direct-uploaded media (photo/video) in a DM thread.              |
-| `mark_message_seen`         | Mark a specific message in an Instagram Direct Message thread as seen.                         |
-| `list_pending_chats`        | Get Instagram Direct Message threads from your pending inbox.                                  |
-| `search_threads`            | Search Instagram Direct Message threads by username or keyword.                                |
-| `get_thread_by_participants`| Get an Instagram Direct Message thread by participant user IDs.                                |
-| `get_thread_details`        | Get details and messages for a specific Instagram Direct Message thread by thread ID.          |
-| `get_user_id_from_username` | Get the Instagram user ID for a given username.                                                |
-| `get_username_from_user_id` | Get the Instagram username for a given user ID.                                                |
-| `get_user_info`             | Get information about a specific Instagram user by username.                        |
-| `search_users`              | Search for Instagram users by username                                              |
-| `get_user_stories`          | Get recent stories from a specific Instagram user by username.                                  |
-| `like_media`               | Like or unlike a specific media post by media ID.                                                       |
-| `get_user_followers`        | Get a list of followers for a specific Instagram user by username.                             |
-| `get_user_following`        | Get a list of users that a specific Instagram user is following by username.                   |
-| `get_user_posts`            | Get recent posts from a specific Instagram user by username.                                   |
-
+### Step 5: Restart Claude
+Completely quit and restart the Claude Desktop app. If successful, **"Buyer Whisperer"** will now appear as an available tool in the tool-use panel.
 
 ---
 
-## Troubleshooting
+## 🎤 The "60-Second CEO" Demo
 
-For additional Claude Desktop integration troubleshooting, see the [MCP documentation](https://modelcontextprotocol.io/quickstart/server#claude-for-desktop-integration-issues). The documentation includes helpful tips for checking logs and resolving common issues.
+This is how you go from zero to a ready-to-send, AI-generated pitch in under a minute.
+
+**1. Get the Analysis Prompt**
+> **Your Command:** `Get my analysis prompt.`
+>
+> **What Happens:** Buyer Whisperer fetches your latest DMs and gives you a single, optimized prompt to send to your AI analyst (Claude).
+
+**2. Get the Analysis Results**
+> **Your Action:** Copy the prompt from Step 1 and paste it into a new Claude chat. Claude will return a single, minified JSON object containing all the KPI scores.
+
+**3. Display Your Intelligence Dashboard**
+> **Your Command:** `Here are the results, show me the table: [paste the KPI JSON from Claude here]`
+>
+> **What Happens:** Buyer Whisperer instantly processes the scores and displays a full intelligence dashboard, showing you exactly who to focus on.
+
+**4. Generate a Pitch for Your Top Lead**
+> **Your Command:** `Now, generate a pitch for our new 'Avenger' sunglasses. Link is https://example.com/avenger.`
+>
+> **What Happens:** The system identifies your best lead from the analysis and gives you a *new* prompt, specifically designed for Claude to write a perfect, conversational pitch.
+
+**5. Deploy the Pitch**
+> **Your Action:** Give the pitch prompt to Claude. It will return a JSON object like `{"@username": ["message 1", "message 2"]}`.
+>
+> **Your Command:** `That pitch is perfect. Send it: [paste the pitch JSON here]`
+>
+> **What Happens:** Buyer Whisperer sends the messages one by one, with human-like delays, to close the deal.
 
 ---
 
-## Feedback
+## 🧰 Full Tool Reference
 
-Your feedback will be massively appreciated. Please [tell us](mailto:tanmay@usegala.com) which features on that list you like to see next or request entirely new ones.
+Buyer Whisperer includes a powerful suite of both high-level "Command" tools and low-level "Foundation" tools.
+
+### ⭐ **Command & Analysis Tools** ⭐
+
+| Tool Name | Description |
+| :--- | :--- |
+| `get_analysis_prompt` | **STEP 1:** Fetches chats and generates a prompt for AI analysis. |
+| `process_and_show_table` | **STEP 2:** Takes AI results and displays the final KPI dashboard. |
+| `generate_pitch_for_best_lead` | Identifies the top lead and generates a prompt to craft a perfect pitch. |
+| `send_conversational_pitch` | Sends a multi-message, human-like pitch sequence. |
+
+### 🔩 **Foundation Tools (The Original Gala Labs Suite)** 🔩
+
+| Tool Name | Description |
+| :--- | :--- |
+| `send_message` | Send a simple text message to a user by username. |
+| `send_photo_message` | Send a photo from a local file path. |
+| `send_video_message` | Send a video from a local file path. |
+| `list_chats` | Get a raw list of DM threads from your account. |
+| `list_messages` | Get a raw list of messages from a specific thread ID. |
+| `mark_message_seen` | Mark a specific message in a thread as "seen". |
+| `list_pending_chats` | Get DM threads from your pending/requests inbox. |
+| `search_threads` | Search your DM threads by username or keyword. |
+| `get_thread_by_participants`| Get a DM thread by providing a list of participant user IDs. |
+| `get_thread_details` | Get the full, raw details for a specific thread ID. |
+| `get_user_id_from_username` | Get a user's numerical ID from their username. |
+| `get_username_from_user_id` | Get a user's username from their numerical ID. |
+| `get_user_info` | Get detailed public profile information about a user. |
+| `check_user_online_status` | Check the real-time presence/online status of users. |
+| `search_users` | Search for Instagram users by their name or username. |
+| `get_user_stories` | Get recent, active stories from a user. |
+| `like_media` | Like or unlike a specific media post. |
+| `get_user_followers` | Get a list of followers for a specific user. |
+| `get_user_following` | Get a list of users that a specific user is following. |
+| `get_user_posts` | Get recent posts from a user's feed. |
+| `list_media_messages` | List only the messages in a thread that contain photos or videos. |
+| `download_media_from_message` | Download a photo/video sent directly in a DM. |
+| `download_shared_post_from_message` | Download a post or reel that was shared in a DM. |
+| `delete_message` | Delete a message you sent in a DM. |
+| `mute_conversation` | Mute or unmute a DM conversation. |
 
 ---
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. 
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.12+-green.svg)
