@@ -1,4 +1,4 @@
-# 🚀 The Buyer Whisperer
+# The Buyer Whisperer
 
 **Turn Your Instagram DMs into an AI-Powered Sales Engine.**
 
@@ -48,7 +48,7 @@ Buyer Whisperer doesn't just read messages; it understands them. It scores every
 | **Personality** | 5 adjectives to describe the user's vibe. |
 | **Common Words** | The top 5 words the user repeats, great for mirroring. |
 
-## 🎞 Infographic Output
+## 🎞 Result Examples
 <p align="center">
   <a href="https://jonroura.com">
     <img src="assets/results.jpg" alt="Buyer Whisperer Results">
@@ -108,18 +108,18 @@ Get up and running in under 5 minutes.
 
 ---
 
-## 🎤 The Command Manual
+## ✅ The Command Manual
 
 Prompt these simple, powerful commands in the Claude app to run the demo.
 
 | Your Goal | The Command to Give Claude |
 | :--- | :--- |
-| **Get Full Analysis** | `Show me the analysis dashboard.` |
+| **Get Full Analysis** | `Show me the analysis dashboard of my insta users.` |
 | **Find Your Biggest Fans** | `Who loves me the most?` |
 | **Find Price-Sensitive Users** | `Who is most price-sensitive?` |
 | **Identify Unhappy Users**| `Who is starting to lose interest?` |
-| **Pitch Your Top Lead** | `Pitch the new 'Avenger' sunglasses to my best lead. They cost $19.99 at https://amazon.com/avenger?tag=buyerwhisperer.` |
-| **Confirm & Send Pitch**| `Yes, send the pitch.` |
+| **⭐ Tailor-Made Product Pitch To Your Top Lead** | `Pitch the new 'Avenger' sunglasses to my best lead. They cost $19.99 at https://amazon.com/avenger?tag=buyerwhisperer.` |
+| **Confirm & Send Pitch**| `Send the pitch.` |
 
 
 ## License
