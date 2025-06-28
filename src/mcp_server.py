@@ -1,35 +1,42 @@
 import argparse
 import logging
 import os
-import re
 import sys
 import time
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from instagrapi import Client
-from pathlib import Path
 
 # --- INITIAL SETUP & CONFIGURATION ---
+
+# Load environment variables from a .env file
 load_dotenv()
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Configure logging for clear, timed output
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
+
 # --- KPI & PROMPT CONFIGURATION ---
-# NEW: Your expanded, more insightful KPI list
+
+# Defines the key performance indicators (KPIs) the AI will analyze
 CONFIGURABLE_KPIS = {
-    "spending": "Score from 0.0 to 1.0 indicating purchase intent.",
-    "price_focus": "Score from 0.0 to 1.0 indicating focus on price/discounts.",
-    "trust": "Score from 0.0 to 1.0 indicating trust in the brand.",
-    "sentiment": "Score from -1.0 (negative) to 1.0 (positive).",
-    "curiosity": "Score from 0.0 to 1.0 indicating how many questions are asked.",
+    "spending": "Flags hot leads already talking about buying.",
+    "price_focus": "Tells you if a discount hook will seal the deal.",
+    "trust": "No sale without belief in you, simple as that.",
+    "sentiment": "Mood check, lets you match tone before pitching.",
+    "curiosity": "High question count points to teach-then-sell copy.",
     "language": "The primary language of the user's messages (e.g., 'English', 'Spanish').",
     "personality": "A list of 5 single-word adjectives describing the user's personality.",
-    "common_words": "A list of the 5 most common (non-filler) words the user uses."
+    "common_words": "A list of the 5 most common (non-filler) words the user uses.",
 }
 
+# The prompt template sent to the AI for conversation analysis
 ANALYSIS_PROMPT_TEMPLATE = """
 Analyze each user brief. For each user_id, return a minified JSON object with values for these KPIs: {kpi_list}.
 For list-based KPIs, return a JSON array of strings. For score-based KPIs, return a float.
@@ -41,15 +48,16 @@ DATA:
 ```
 """
 
+# The prompt template for generating a sales pitch
 PITCH_PROMPT_TEMPLATE = """
 You are a master salesperson on Instagram. Your tone is super-human, casual, and brief.
 **Your Goal:** Generate interest in a product.
 **Product:** {product_name} ({product_description})
 **Link:** {product_link}
 **Rules:**
-1. **DETECT LANGUAGE:** Analyze the user's conversation history and write your pitch in that SAME language.
-2. **BE CONVERSATIONAL:** Your output MUST be a JSON array of 2-4 short strings. Each string is a separate message bubble.
-3. **INCLUDE THE LINK:** Weave the `product_link` naturally into one of the messages.
+1.  **DETECT LANGUAGE:** Analyze the user's conversation history and write your pitch in that SAME language.
+2.  **BE CONVERSATIONAL:** Your output MUST be a JSON array of 2-4 short strings. Each string is a separate message bubble.
+3.  **INCLUDE THE LINK:** Weave the `product_link` naturally into one of the messages.
 **Target and their recent conversation history:**
 ```json
 {target_brief_json}
@@ -59,164 +67,248 @@ A single JSON object where the key is the username and the value is an array of 
 Example: `{{"@{username}": ["Hey! 👋", "Check this out, thought you'd love it:", "{product_link}"]}}`
 """
 
+
 # --- MCP SERVER & GLOBAL STATE ---
-INSTRUCTIONS = "Insta Buyer is online. Use the provided command phrases."
+
+INSTRUCTIONS = "Insta Buyer is online. Use simple, direct commands to analyze and pitch."
 client = Client()
 mcp = FastMCP(name="Insta Buyer", instructions=INSTRUCTIONS)
-MY_IG_USER_ID = None
-SESSION_ANALYSIS = {} # In-memory cache for the current session
 
-# --- HELPER FUNCTIONS ---
-def _format_message_brief(messages: List[Dict], my_user_id: str) -> List[str]:
-    brief = []
-    for msg in messages:
-        if str(msg.get('user_id')) == my_user_id: continue
-        text = msg.get('text')
-        if text: brief.append(text[:200])
-        else: brief.append(f"[{msg.get('item_type', 'media')}]")
-    return brief
+# Global variables to store session state
+MY_IG_USER_ID = None
+SESSION_ANALYSIS = {}
+
+
+# --- THE APEX ENGINE (PRIVATE & IMPLICIT) ---
+
+def _run_analysis_if_needed() -> bool:
+    """
+    Fetches Instagram DMs and sends them to the AI for analysis.
+    This function only runs once per session to avoid redundant API calls.
+    """
+    global SESSION_ANALYSIS
+    if SESSION_ANALYSIS:
+        return True  # Analysis already completed in this session
+
+    try:
+        # Fetch the 20 most recent chats, with up to 20 messages each
+        logger.info("Fetching recent conversations for analysis...")
+        chats = client.direct_threads(amount=20, thread_message_limit=20)
+        
+        # Build a payload of user conversations, excluding groups
+        for t in chats:
+            if t.is_group:
+                continue
+            data = t.model_dump(mode="json")
+            other_user = next((u for u in data.get("users", []) if str(u.get("pk")) != MY_IG_USER_ID), None)
+            
+            if not other_user:
+                continue
+
+            user_id = str(other_user.get("pk"))
+            # Create a clean brief of the last 10 messages from the other user
+            brief = [
+                msg.get("text")
+                for msg in data.get("messages", [])
+                if msg.get("text") and str(msg.get("user_id")) != MY_IG_USER_ID
+            ][:10]
+
+            if brief: # Only include users who have sent messages
+                SESSION_ANALYSIS[user_id] = {
+                    "username": other_user.get("username"),
+                    "brief": brief,
+                }
+
+        if not SESSION_ANALYSIS:
+            logger.info("No user conversations found to analyze.")
+            return True # Successful, but nothing to do
+
+        # Prepare the data and prompt for the AI
+        briefs_for_prompt = [{"user_id": uid, "brief": data["brief"]} for uid, data in SESSION_ANALYSIS.items()]
+        prompt = ANALYSIS_PROMPT_TEMPLATE.format(
+            kpi_list=json.dumps(list(CONFIGURABLE_KPIS.keys())),
+            user_briefs_json=json.dumps(briefs_for_prompt, indent=2),
+        )
+
+        print(prompt)  # This sends the prompt to the Claude app
+        claude_response_str = input()  # This receives the AI's JSON response
+        kpi_results = json.loads(claude_response_str)
+
+        # Merge the AI's KPI results back into our session data
+        for user_id, kpis in kpi_results.items():
+            if user_id in SESSION_ANALYSIS:
+                SESSION_ANALYSIS[user_id]["kpis"] = kpis
+        
+        logger.info(f"Analysis complete for {len(kpi_results)} users.")
+        return True
+
+    except Exception as e:
+        logger.error(f"Analysis engine failed: {e}", exc_info=True)
+        return False
+
 
 # --- THE CEO'S COMMAND CONSOLE (PUBLIC TOOLS) ---
 
 @mcp.tool()
-def get_analysis_prompt() -> Dict[str, Any]:
-    """
-    STEP 1 for Analysis: Fetches chats, caches user data, and returns a prompt for Claude.
-    """
-    global MY_IG_USER_ID, SESSION_ANALYSIS
-    if not MY_IG_USER_ID: MY_IG_USER_ID = str(client.user_id)
-    
-    try:
-        chats_response = client.direct_threads(amount=20, thread_message_limit=20)
-    except Exception as e:
-        return {"success": False, "message": f"Failed to fetch chats: {e}"}
-
-    # Clear previous analysis and cache new data
-    SESSION_ANALYSIS = {}
-    user_briefs_for_prompt = []
-
-    for t in chats_response:
-        if t.is_group: continue
-        thread_data = t.model_dump(mode='json')
-        other_user = next((u for u in thread_data.get('users', []) if str(u.get('pk')) != MY_IG_USER_ID), None)
-        if not other_user: continue
-        
-        user_id = str(other_user.get('pk'))
-        username = other_user.get('username')
-        brief = _format_message_brief(thread_data.get('messages', []), MY_IG_USER_ID)
-
-        # Cache the data needed for later steps
-        SESSION_ANALYSIS[user_id] = {"username": username, "brief": brief, "kpis": {}}
-        user_briefs_for_prompt.append({"user_id": user_id, "brief": brief})
-
-    if not user_briefs_for_prompt:
-        return {"success": True, "message": "No user conversations found to analyze."}
-
-    prompt = ANALYSIS_PROMPT_TEMPLATE.format(
-        kpi_list=json.dumps(list(CONFIGURABLE_KPIS.keys())),
-        user_briefs_json=json.dumps(user_briefs_for_prompt, indent=2)
-    )
-
-    return {
-        "success": True,
-        "action": "Provide the 'prompt_for_analyst' to your analyst (Claude). Then, use the output to run `process_and_show_analysis`.",
-        "prompt_for_analyst": prompt
-    }
-
-@mcp.tool()
-def process_and_show_analysis(kpi_results: Dict[str, Dict]) -> Dict[str, Any]:
-    """
-    STEP 2 for Analysis: Merges KPI results with cached data and displays the table.
-    """
+def show_analysis_dashboard() -> Dict[str, Any]:
+    """COMMAND: Get a full KPI analysis table of recent chats."""
+    if not _run_analysis_if_needed():
+        return {"success": False, "message": "Analysis failed."}
     if not SESSION_ANALYSIS:
-        return {"success": False, "message": "No analysis has been run. Please run `get_analysis_prompt` first."}
-    if not kpi_results:
-        return {"success": False, "message": "KPI results cannot be empty."}
-
-    # Merge results into the cache
-    for user_id, kpis in kpi_results.items():
-        if user_id in SESSION_ANALYSIS:
-            SESSION_ANALYSIS[user_id]["kpis"] = kpis
+        return {"success": True, "message": "No user conversations found."}
 
     kpi_names = list(CONFIGURABLE_KPIS.keys())
     header = f"| {'User':<20} |" + " | ".join([f" {kpi.title():<15} " for kpi in kpi_names]) + "|"
-    separator = "|-" + "-"*20 + "-|" + ("-"*17 + "|") * len(kpi_names)
+    separator = "|-" + "-" * 20 + "-|" + ("-" * 17 + "|") * len(kpi_names)
     rows = [header, separator]
-    
-    for user_id, data in SESSION_ANALYSIS.items():
-        username = data.get('username', f'user_{user_id}')
-        row_str = f"| @{username:<18} |"
+
+    for data in SESSION_ANALYSIS.values():
+        row_str = f"| @{data.get('username', 'N/A'):<18} |"
+        kpis = data.get("kpis", {})
         for kpi in kpi_names:
-            score = data['kpis'].get(kpi)
-            if isinstance(score, list):
-                cell = ", ".join(score)[:15]
-            elif isinstance(score, (int, float)):
-                cell = f"{score:.2f}"
+            value = kpis.get(kpi, "N/A")
+            # Format cell content for concise display in the table
+            if isinstance(value, list):
+                cell = ", ".join(value)[:15]
+            elif isinstance(value, (int, float)):
+                cell = f"{value:.2f}"
             else:
-                cell = str(score)[:15]
+                cell = str(value)[:15]
             row_str += f" {cell:<15} |"
         rows.append(row_str)
-        
+
     return {"success": True, "analysis_table": "\n".join(rows)}
 
 
 @mcp.tool()
-def generate_pitch_for_best_lead(product_name: str, product_link: str, product_description: str) -> Dict[str, Any]:
-    """
-    Finds the single best lead from the last analysis and generates a pitch prompt.
-    """
-    if not SESSION_ANALYSIS:
-        return {"success": False, "message": "Please run an analysis first."}
+def show_top_users(kpi: str, count: int = 5, ascending: bool = False) -> Dict[str, Any]:
+    """COMMAND: Ranks users by a specific KPI and requests an infographic artifact."""
+    if not _run_analysis_if_needed():
+        return {"success": False, "message": "Analysis failed."}
+    if kpi not in CONFIGURABLE_KPIS:
+        return {"success": False, "message": f"Invalid KPI. Use one of: {list(CONFIGURABLE_KPIS.keys())}"}
 
-    leads = [{'user_id': uid, **data} for uid, data in SESSION_ANALYSIS.items() if isinstance(data['kpis'].get('spending'), (int, float))]
-    if not leads: return {"success": True, "message": "No potential leads found in the analysis."}
+    # Filter for users that have a numeric score for the chosen KPI
+    scored_users = [
+        d for d in SESSION_ANALYSIS.values() if isinstance(d.get("kpis", {}).get(kpi), (int, float))
+    ]
+    if not scored_users:
+        return {"success": True, "message": f"No users had a valid score for '{kpi}'."}
+
+    # Sort users and select the top N
+    sorted_users = sorted(scored_users, key=lambda item: item["kpis"][kpi], reverse=not ascending)
+    top_users = sorted_users[:count]
+
+    # Prepare data for the infographic
+    infographic_data = [
+        {"username": f"@{user['username']}", "score": user["kpis"][kpi]} for user in top_users
+    ]
+
+    # Instead of generating HTML, ask the AI to create a visual artifact
+    return {
+        "success": True,
+        "infographic_request": {
+            "prompt": f"Please create a visually stunning, jaw-dropping infographic showing the top {len(top_users)} users for the '{kpi.replace('_', ' ').title()}' KPI. Use the provided data to build a leaderboard.",
+            "data": infographic_data,
+            "ranking_direction": "Ascending" if ascending else "Descending"
+        }
+    }
+
+
+@mcp.tool()
+def pitch_best_lead(product_name: str, product_link: str, product_description: str) -> Dict[str, Any]:
+    """COMMAND: Finds the single best lead, generates a pitch, and asks for confirmation to send."""
+    if not _run_analysis_if_needed():
+        return {"success": False, "message": "Analysis failed."}
+
+    leads = [
+        d for d in SESSION_ANALYSIS.values() if isinstance(d.get("kpis", {}).get("spending"), (int, float))
+    ]
     
-    top_lead = sorted(leads, key=lambda item: item['kpis']['spending'], reverse=True)[0]
-    
+    # *** BUG FIX: Check if leads exist BEFORE trying to access the list ***
+    if not leads:
+        return {"success": True, "message": "No potential leads with a 'spending' score were found."}
+
+    # Identify the single best lead based on the 'spending' KPI
+    top_lead = sorted(leads, key=lambda item: item["kpis"]["spending"], reverse=True)[0]
+
+    # Format the prompt to generate the pitch
     pitch_prompt = PITCH_PROMPT_TEMPLATE.format(
         product_name=product_name,
         product_link=product_link,
         product_description=product_description,
-        target_brief_json=json.dumps({"username": top_lead['username'], "conversation_history": top_lead['brief']}, indent=2)
+        target_brief_json=json.dumps(
+            {"username": top_lead["username"], "conversation_history": top_lead["brief"]},
+            indent=2,
+        ),
     )
-    
-    return {"success": True, "pitch_generation_prompt": pitch_prompt}
+
+    print(pitch_prompt)
+    claude_response_str = input()
+
+    try:
+        pitch_data = json.loads(claude_response_str)
+        username = list(pitch_data.keys())[0]
+        messages = pitch_data[username]
+
+        # Return the drafted pitch and ask for final confirmation to send
+        return {
+            "success": True,
+            "confirmation_request": f"I have drafted a {len(messages)}-part message for {username}. Shall I send it?",
+            "pitch_to_send": pitch_data,
+        }
+    except Exception as e:
+        return {"success": False, "message": f"Could not process pitch response: {e}"}
+
 
 @mcp.tool()
-def send_conversational_pitch(pitch_data: Dict[str, List[str]]) -> Dict[str, Any]:
-    """Sends a sequence of messages from the analyst's pitch output."""
+def send_confirmed_pitch(pitch_data: Dict[str, List[str]]) -> Dict[str, Any]:
+    """(Private Action) Sends the pitch after user confirms in the chat."""
     sent_count = 0
     for username, messages in pitch_data.items():
         try:
-            user_id = client.user_id_from_username(username.lstrip('@'))
-            if not user_id: continue
-            
+            # Remove "@" and get user ID
+            clean_username = username.lstrip("@")
+            user_id = client.user_id_from_username(clean_username)
+            if not user_id:
+                logger.warning(f"Could not find user ID for {username}. Skipping.")
+                continue
+
+            # Send each message with a realistic delay
             for msg_text in messages:
                 client.direct_send(msg_text, user_ids=[user_id])
                 time.sleep(2.5)
+            
+            logger.info(f"Successfully sent pitch to {username}.")
             sent_count += 1
         except Exception as e:
-            logger.error(f"Failed to engage @{username}: {e}")
-            
-    if sent_count > 0:
-        return {"success": True, "message": f"Pitch successfully sent to {sent_count} user(s)."}
-    else:
-        return {"success": False, "message": "Failed to send the pitch."}
+            logger.error(f"Failed to engage {username}: {e}")
+
+    return {"success": True, "message": f"Pitch sent to {sent_count} user(s)."}
+
 
 # --- MAIN EXECUTION BLOCK ---
 if __name__ == "__main__":
-   parser = argparse.ArgumentParser()
-   parser.add_argument("--username", type=str, help="Instagram username")
-   parser.add_argument("--password", type=str, help="Instagram password")
-   args = parser.parse_args()
-   username = args.username or os.getenv("INSTAGRAM_USERNAME")
-   password = args.password or os.getenv("INSTAGRAM_PASSWORD")
-   if not username or not password:
-       sys.exit("FATAL: Instagram credentials not provided.")
-   try:
-       client.login(username, password)
-       MY_IG_USER_ID = str(client.user_id)
-       mcp.run(transport="stdio")
-   except Exception as e:
-       logger.error(f"FATAL ERROR DURING STARTUP: {e}", exc_info=True)
-       sys.exit(1)
+    # Setup command-line argument parsing
+    parser = argparse.ArgumentParser(description="Insta Buyer: AI-Powered Instagram DM Sales Engine")
+    parser.add_argument("--username", type=str, help="Instagram username")
+    parser.add_argument("--password", type=str, help="Instagram password")
+    args = parser.parse_args()
+
+    # Get credentials from arguments or environment variables
+    username = args.username or os.getenv("INSTAGRAM_USERNAME")
+    password = args.password or os.getenv("INSTAGRAM_PASSWORD")
+
+    if not username or not password:
+        sys.exit("FATAL: Instagram credentials were not provided via arguments or .env file.")
+
+    # Main application loop
+    try:
+        logger.info(f"Attempting to log in as {username}...")
+        client.login(username, password)
+        MY_IG_USER_ID = str(client.user_id)
+        logger.info("Login successful. Starting MCP server...")
+        mcp.run(transport="stdio")
+    except Exception as e:
+        logger.error(f"FATAL ERROR DURING STARTUP: {e}", exc_info=True)
+        sys.exit(1)
